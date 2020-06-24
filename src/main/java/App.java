@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /*
@@ -14,7 +16,105 @@ public class App {
 
     public String bestCharge(List<String> inputs) {
         //TODO: write code here
+        List<Item> ALL_ITEMS = itemRepository.findAll(); // 取所有商品
+        List<SalesPromotion> ALL_SALES_PROMOTIONS = salesPromotionRepository.findAll();//取所有促销商品
+        List<String> ids = new ArrayList<>(); //用来存储菜品id号
+        List<Integer> nums = new ArrayList<>();//用来存储购买菜品的数量
+        String orderDetails = ""; // 用来存储菜品的细节信息
 
-        return null;
+        //处理inputs字符串，将菜品id号和购买数量分离
+        for (String s:inputs) {
+            ids.add(s.substring(0,8));//截取前面商品id号部分
+            nums.add(Integer.parseInt(s.substring(11)));//截取后面菜品数量
+        };
+
+        int totalPrice = 0; // 存储未优惠的价格
+        int totalPrice_alterPromotion = 0; // 存储优惠后的价格
+
+        //首先计算总价格
+        for(int i = 0; i < ids.size(); i ++){
+            for (Item item : ALL_ITEMS) {
+                    if(item.getId().equals(ids.get(i))){
+                        int price = (int)(item.getPrice() * nums.get(i));//计算单个商品总价
+                        totalPrice += price; //计算未优惠的总价格
+                        orderDetails += item.getName() + " x " + nums.get(i) + " = " + price + " yuan\n" ;//储存菜品的购买细节
+                    }
+            }
+        }
+
+        //1. 若总价未超过30块
+        if(totalPrice <= 30 ){
+            totalPrice_alterPromotion = totalPrice;
+            return "============= Order details =============\n"+
+                    orderDetails +
+                    "-----------------------------------\n" +
+                    "Total：" +  totalPrice_alterPromotion + " yuan\n" +
+                    "===================================";
+        }
+
+        //2. 若总价超过30块，则使用优惠。
+        else{
+            //2.1  第一种优惠政策，满30减6
+            int totalPrice_Promotion1 = totalPrice - 6;//存储使用促销1活动后的总价
+            String displayName1 = "满30减6 yuan，saving 6 yuan\n";//存储促销1的信息
+
+            //2.2  第二种优惠政策，某些菜半价
+            int totalPrice_Promotion2 = totalPrice;//存储使用促销2活动后的总价
+            List<String> promotionNameList = new ArrayList<>(); //存储减价的菜品信息
+            String displayName2 = ALL_SALES_PROMOTIONS.get(1).getDisplayName();//存储促销2的信息
+            int saveMoney = 0;//存储节省的金钱
+
+            //循环购买的菜品，看是否有符合促销活动的菜品。
+            for (int i = 0; i < ids.size(); i ++){
+                for (SalesPromotion salesPromotion:ALL_SALES_PROMOTIONS) {
+                        for(String id : salesPromotion.getRelatedItems()){
+                            //若存在有正在促销的菜品，则可以半价。
+                            if(id.equals(ids.get(i))){
+                                for(Item item : ALL_ITEMS){
+                                    if(item.getId().equals(id)){
+                                        promotionNameList.add(item.getName()); //将该促销的菜品信息加入促销列表中
+                                        saveMoney += item.getPrice() / 2;//节省一般的价钱
+                                        totalPrice_Promotion2 -= item.getPrice() / 2;//总价减少该菜品价格的一半
+                                    }
+                                }
+                            }
+                        }
+                }
+            }
+
+            String promotionName = String.join("，" , promotionNameList);//将促销列表里面的菜品用逗号分割开
+            //拼接促销的信息
+            displayName2 += " (" +  promotionName + ")";
+            displayName2 += "，saving " + saveMoney + " yuan\n";
+
+
+            //若使用促销1活动后的价格小于使用促销2活动后的价格,则采用促销1活动
+            if(totalPrice_Promotion1 <= totalPrice_Promotion2){
+                totalPrice_alterPromotion = totalPrice_Promotion1;
+                return "============= Order details =============\n" +
+                        orderDetails +
+                        "-----------------------------------\n" +
+                        "Promotion used:\n" +
+                        displayName1 +
+                        "-----------------------------------\n" +
+                        "Total：" + totalPrice_alterPromotion + " yuan\n" +
+                        "===================================";
+            }
+
+            //反之，采用促销2活动
+            else{
+                totalPrice_alterPromotion = totalPrice_Promotion2;
+                return "============= Order details =============\n" +
+                        orderDetails +
+                        "-----------------------------------\n" +
+                        "Promotion used:\n" +
+                        displayName2 +
+                        "-----------------------------------\n" +
+                        "Total：" + totalPrice_alterPromotion + " yuan\n" +
+                        "===================================";
+            }
+
+        }
+
     }
 }
